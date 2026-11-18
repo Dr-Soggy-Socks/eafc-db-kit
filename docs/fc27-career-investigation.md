@@ -44,3 +44,22 @@ The library's automated FC 27 coverage uses a real *squad* and synthetic *career
 - https://github.com/xAranaktu/FIFASquadFileDownloader (independent `FBCHUNKS` file construction)
 
 These are reference implementations, not proof that FC 27 uses identical layouts.
+
+## Second investigation checkpoint — compact directory confirmed
+
+A new bounds-checked read-only detector, `scripts/fc27-compact-directory.mjs`, identifies **one** compact directory starting at absolute offset 704599. Unlike the legacy T3DB layout, this candidate uses:
+
+- signature `DB 00 08 00 00 00 00`;
+- declared byte length as UInt32 LE at signature +8;
+- 27 table entries as UInt32 LE at signature +12 (**not +16**);
+- a 4-byte header word at +16;
+- table codes and 32-bit offsets starting at +20;
+- relative table offsets referenced from signature +24 + 8 × table count.
+
+All 27 table names in this directory match the supplied FC27 XML: `teams`, `manager`, `players`, `teamplayerlinks`, `leagues`, `formations`, and others. Entry offsets are ordered, in bounds, and non-overlapping. This establishes a reliable directory index, **not** a usable record decoder.
+
+The first `teams` range contains all 110 field short codes from the FC27 XML within its early metadata region. Many entries appear in compact 9-byte `shortCode(4) / depth(1) / cumulativeBitEnd(4)` sequences, with exceptional entries of different lengths. Ordinary club names are also recognizable within that range, confirming the location is meaningful; raw club entries have **not** been safely decoded into structured records. Other tables show different field placement and require further investigation.
+
+Do **not** feed these compact table regions into the existing 36-byte-header/16-byte-field legacy T3DB parser. The layout differs. Do **not** attempt serialization or record edits yet. The current detector refuses writes by design.
+
+Targeted synthetic tests: 7 passing, covering compact directory boundaries, name/offset validation, and legacy-format rejection. The diagnostic tool printed exactly one compact directory for the private test copy, and the full pre-change library suite was 160 passing/4 skipped.

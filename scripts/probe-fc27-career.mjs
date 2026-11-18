@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findCompactDirectories } from './fc27-compact-directory.mjs';
 
 const dbSignature = Buffer.from([0x44, 0x42, 0x00, 0x08]);
 const standardHeaderLength = 28;
@@ -95,6 +96,7 @@ export function probeCareerContainer(input) {
     databaseCandidates: findOffsets(bytes, dbSignature)
       .filter((offset) => offset + standardHeaderLength <= bytes.length)
       .map((offset) => inspectDatabaseCandidate(bytes, offset)),
+    compactDatabaseCandidates: findCompactDirectories(bytes),
     note: 'Read-only structural probe; candidate database headers may be false positives.',
   };
 }
