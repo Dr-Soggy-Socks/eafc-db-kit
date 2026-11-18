@@ -142,3 +142,23 @@ Some serialized field positions in the career metadata coincide with template fi
 **Conclusion:** the underlying schema and declared table allocations are stable, but the career-save record body uses a different layout, offset mapping, framing, encoding, or combination thereof. Determine this representation before any record reads or writes. We do **not** yet have a safe career editor.
 
 All data used came from archived offline copies. This investigation has not modified the user's live game or career saves.
+
+## Sleep checkpoint — exact player-record anchors found (18 November 2026)
+
+**Do not run the game, modify the active save, or attempt edits yet.** The user is playing FC27 and requested that this research state be preserved.
+
+The local research script, `research-fc27-anchor-match.mjs`, finds 16-byte fingerprints from the bundled, known-good FC27 database inside a separately copied, later career save. The baseline template player table starts at byte **1219340**, has **21623** records of 156 bytes each. The later archived career snapshot places its player field-map metadata around **1017558–1018916**, and the following variable-length data starts near **1018924**. These addresses are observations from one copy, **not** general file-format constants.
+
+Read-only scan results for the later offline snapshot:
+- **18,473 / 21,623** template player row indices have one or more exact byte fingerprint matches in the career data (single-anchor matches can be ambiguous).
+- **13,035** have at least 2 matching anchors; **8,097** have at least 3; **5,596** have at least 4.
+- First ~50 indexed matches occur in increasing order, with **variable byte stride** around 108–151 bytes.
+- For the **8,097** matches meeting the initial 3-anchor confidence filter, interpreting the first **370** bits using the template schema produced **8,097 identical potential values** between reference and career, while 8,094 had the same height and 8,022 the same strength.
+- Seven known player IDs were spot-checked against the template and had aligned potential in the corresponding career byte range, but several matches had weak (one-anchor) confidence. They are **not** independently verified career record identities.
+- Fingerprint comparison shows the career representation often matches reference records for their first 80+ bytes, then omits or compacts certain later bytes. This explains why 156-byte stride decoding was unsuccessful.
+
+**Caveat:** these observations validate matching *fragments* of existing reference rows, not a complete parser. They do not prove that player ratings, career-specific attributes, current player/team assignments, injuries or transfers can be read or written. The exact compressed/variable-length record framing, row count, changing field groups and player key mapping remain to be solved. No output save, in-game validation, or GUI is ready.
+
+Next research steps: (1) turn the anchor scanner into a deterministic testable reader accepting offline file paths; (2) establish complete row boundaries and validate a high-confidence player ID and rating against an in-game observation; (3) confirm data changes in controlled offline snapshots; (4) only then create a reversible no-op writer on a separate test save.
+
+This note contains research statistics and offsets only. **Never upload private save bytes to GitHub.**
