@@ -126,3 +126,19 @@ Both tools are read-only and report byte ranges, structural metadata, and table 
 The tentative hypothesis that all player records are a simple 1,244-bit fixed-stride array **failed** independent checks against observed player values. Known-ID anchor scans did not produce convincing aligned player IDs and ratings. We must not treat field metadata offsets as confirmed per-record addresses.
 
 **Next engineering work:** locate or decompress the actual table record bodies, establish record boundaries, decode known player IDs with plausible ratings/potential, then test an unchanged write on a new copy. The original save remains untouched; editing stays disabled until those checks pass.
+
+## Fifth checkpoint — standard 156-byte player encoding disproved in career snapshots
+
+A positive control with the bundled, validated FC27 `fifa_ng_db.db` template confirmed:
+
+- `players` record size **156 bytes**, written records **21,623**, no cancelled records.
+- The template's actual field starts include `playerid` at bit **1040**, `overallrating` at **1106**, `potential` at **370**, `height` at **514**, `weight` at **655**, and `wage` at **668**.
+- A 4,000-record plausibility check using those positions identified **89.9%** as plausible players (ID, ratings, potential, size, physical attributes).
+
+By contrast, applying the **same known-good field positions** to fixed-stride 156-byte rows in each offline career snapshot found no reliable alignment. Searches across several sections in both relevant player-data regions and all 156 phase offsets produced at best about **2.7%** plausible rows (short 450-row windows). An earlier test with 1,244-bit strides also failed. These negative results have a genuine positive control, so they cannot be dismissed as a broken test harness.
+
+Some serialized field positions in the career metadata coincide with template field ends (`potential` 377 vs template start 370 with width 7), while others differ substantially (`playerid` value 160 vs template start 1040 with width 19). They **must not** be blindly treated as T3DB row bit offsets.
+
+**Conclusion:** the underlying schema and declared table allocations are stable, but the career-save record body uses a different layout, offset mapping, framing, encoding, or combination thereof. Determine this representation before any record reads or writes. We do **not** yet have a safe career editor.
+
+All data used came from archived offline copies. This investigation has not modified the user's live game or career saves.
