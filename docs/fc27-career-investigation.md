@@ -63,3 +63,29 @@ The first `teams` range contains all 110 field short codes from the FC27 XML wit
 Do **not** feed these compact table regions into the existing 36-byte-header/16-byte-field legacy T3DB parser. The layout differs. Do **not** attempt serialization or record edits yet. The current detector refuses writes by design.
 
 Targeted synthetic tests: 7 passing, covering compact directory boundaries, name/offset validation, and legacy-format rejection. The diagnostic tool printed exactly one compact directory for the private test copy, and the full pre-change library suite was 160 passing/4 skipped.
+
+## Third investigation checkpoint — field metadata recovered, records not yet decoded
+
+The compact directory alone is not sufficient to locate physical table content: its offsets do **not** map to the T3DB reader's assumed physical table layout. Treat those offsets as format-specific and unresolved; do not use them for writes.
+
+The read-only `scripts/fc27-compact-fields.mjs` now matches field descriptors in the **reverse-ASCII ordering of their 4-character short names**, as verified against the bundled FC27 XML. Descriptor gaps are **5, 8, 9, 11, or 16 bytes**. Width and storage-type checks are applied where their encoding is confirmed. Any unknown/implausible bit position remains `null`; no value is fabricated.
+
+The inspection command is:
+
+```sh
+node scripts/inspect-fc27-field-metadata.mjs /path/to/private/CmMgrC...
+```
+
+The private FC27 test save yielded exactly **one** complete field-block match for each priority table:
+
+| Table | XML fields matched | Field block start | Unknown offsets |
+| --- | ---: | ---: | ---: |
+| `players` | 152 / 152 | 1093726 | 1 |
+| `teams` | 110 / 110 | 704861 | 5 |
+| `teamplayerlinks` | 16 / 16 | 4113315 | 2 |
+
+Player descriptors include `playerid` (bit offset 160), `potential` (377), `overallrating` (1113), `wage` (695) and `releaseclause` (1009). These are *serialized field metadata positions*; they have **not** been applied to verified player row boundaries.
+
+We tested a fixed-row hypothesis against the local copy over several row sizes, alignments and sample lengths. None yielded reliable player statistics or a strong record-width signal. **No individual player records, player identities, ratings, or transfer values are decoded yet.** Record storage may require a different method and cannot be assumed fixed-width from the schema.
+
+Next: characterize the physical player record segment and any per-row framing or encoding; verify multiple known player IDs and consistent field values before creating an editable copy. All analysis so far remains read-only. Do not upload any save or raw player data to GitHub.
