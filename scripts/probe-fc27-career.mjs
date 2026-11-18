@@ -24,6 +24,7 @@ function inspectDatabaseCandidate(bytes, offset) {
   const count = endianness === 'big'
     ? bytes.readInt32BE(offset + 16) : bytes.readInt32LE(offset + 16);
   const reasons = [];
+  const tableOffsets = [];
 
   if (platformFlag > 1 || bytes[offset + 5] !== 0 ||
       bytes[offset + 6] !== 0 || bytes[offset + 7] !== 0) {
@@ -49,15 +50,37 @@ function inspectDatabaseCandidate(bytes, offset) {
           reasons.push(`table entry ${i} points outside database bounds`);
           break;
         }
+        tableOffsets.push(directoryEnd + relative);
       }
     }
   }
 
+  const directoryBoundsPass = reasons.length === 0;
+  let legacyTableHeadersPass = null;
+  if (directoryBoundsPass && count > 0) {
+    const positions = [...tableOffsets].sort((a, b) => a - b);
+    const readI32 = at => endianness === 'big' ? bytes.readInt32BE(at) : bytes.readInt32LE(at);
+    const readU16 = at => endianness === 'big' ? bytes.readUInt16BE(at) : bytes.readUInt16LE(at);
+    legacyTableHeadersPass = positions.every((pos, i) => {
+      const end = positions[i + 1] ?? offset + length;
+      if (pos + 36 > end) return false;
+      const recordSize = readI32(pos + 4);
+      const capacity = readU16(pos + 16);
+      const written = readU16(pos + 18);
+      const cancelled = readU16(pos + 20);
+      const fieldCount = bytes[pos + 24];
+      return recordSize >= 0 && (capacity === 0 || recordSize > 0) &&
+        written <= capacity && cancelled <= written && pos + 36 + fieldCount * 16 <= end;
+    });
+    if (!legacyTableHeadersPass) reasons.push('table header layout differs from legacy T3DB');
+  }
   return {
     offset,
     endianness,
     declaredByteLength: length,
     declaredTableCount: count,
+    directoryBoundsPass,
+    legacyTableHeadersPass,
     matchesCurrentParserLayout: reasons.length === 0,
     reasons,
   };

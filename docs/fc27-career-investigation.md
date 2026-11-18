@@ -89,3 +89,40 @@ Player descriptors include `playerid` (bit offset 160), `potential` (377), `over
 We tested a fixed-row hypothesis against the local copy over several row sizes, alignments and sample lengths. None yielded reliable player statistics or a strong record-width signal. **No individual player records, player identities, ratings, or transfer values are decoded yet.** Record storage may require a different method and cannot be assumed fixed-width from the schema.
 
 Next: characterize the physical player record segment and any per-row framing or encoding; verify multiple known player IDs and consistent field values before creating an editable copy. All analysis so far remains read-only. Do not upload any save or raw player data to GitHub.
+
+## Fourth investigation checkpoint — two real FC27 career snapshots (read-only)
+
+A **second, later save** was detected while the game was running. It was no longer held open by a process and had not changed for over ten minutes. We made a **read-only snapshot**, validated stable file metadata during copying, and checked its SHA-256 against the source. We did not modify, stop, or restart FC27. The older archived copy remains unchanged. Both snapshots stay outside Git.
+
+The offline snapshots are both **15,793,835 bytes**, with different SHA-256 hashes. A bytewise comparison finds 5,297,119 changed common bytes, mainly in the save header and central payload; the remaining large trailing region is identical. Because serialization can reorder/resize regions, this **does not** mean 5.3 MB of gameplay attributes changed.
+
+### Two directory-header variants within the same career
+
+The earlier snapshot has a 27-table directory at offset **704599**, with the table-count field at signature +12 and directory entries from +20. The newer snapshot has a 27-table directory at **705037**, with the count at +16 and entries from +24. The ordinary legacy `parseEaFile` reader **still fails** on the newer snapshot: despite the standard-style directory, its table headers do not match the legacy 36-byte table format (`INVALID_FORMAT: lyxL`). Therefore neither snapshot is a validated editable T3DB.
+
+Our new `scripts/fc27-table-directory.mjs` recognises both directory variants with strict bounds and table-name checks, without attempting record reads or writes. Comparison by four-character table identity finds:
+
+- All **27** table identities in both snapshots
+- **26 of 27** equal *declared directory allocations*
+- The remaining `yYtg` last-table allocation differs by **4 bytes**, consistent with the directory header-size difference, though causality is not established
+- **23** table names have different ordering in the two directories
+- The `players` table allocation is exactly **4,214,488 bytes** in both snapshots, regardless of directory position
+
+The metadata scanner also finds one complete field block each for `players` (152 fields), `teams` (110), and `teamplayerlinks` (16) in **both** snapshots, though absolute byte positions move substantially.
+
+### Reproducible investigation commands
+
+Run only on two separately copied, stable saves; **do not point these commands at an actively written game save**.
+
+```sh
+node scripts/diff-fc27-saves.mjs /path/to/offline-save-A /path/to/offline-save-B
+node scripts/compare-fc27-structure.mjs /path/to/offline-save-A /path/to/offline-save-B
+```
+
+Both tools are read-only and report byte ranges, structural metadata, and table identities, not raw player data.
+
+### Decoding status
+
+The tentative hypothesis that all player records are a simple 1,244-bit fixed-stride array **failed** independent checks against observed player values. Known-ID anchor scans did not produce convincing aligned player IDs and ratings. We must not treat field metadata offsets as confirmed per-record addresses.
+
+**Next engineering work:** locate or decompress the actual table record bodies, establish record boundaries, decode known player IDs with plausible ratings/potential, then test an unchanged write on a new copy. The original save remains untouched; editing stays disabled until those checks pass.

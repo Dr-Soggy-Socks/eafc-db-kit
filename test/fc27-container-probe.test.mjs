@@ -59,3 +59,22 @@ test('handles small and unknown buffers without throwing', () => {
   assert.deepEqual(probeCareerContainer(Buffer.alloc(0)).databaseCandidates, []);
   assert.equal(probeCareerContainer(Buffer.from('not a save')).magic, 'not a sa');
 });
+
+test('distinguishes a valid directory from an incompatible table header', () => {
+  const bytes=Buffer.alloc(512);
+  bytes.write('FBCHUNKS',0,'ascii');
+  bytes.write('Career',18,'utf8');
+  const at=100;
+  bytes.set([0x44,0x42,0,8,0,0,0,0],at);
+  bytes.writeInt32LE(200,at+8);
+  bytes.writeInt32LE(1,at+16);
+  bytes.write('lyxL',at+24,'ascii');
+  bytes.writeUInt32LE(0,at+28);
+  const table=at+36;
+  bytes.writeUInt16LE(1,table+16);
+  bytes.writeUInt16LE(1,table+18);
+  const [candidate]=probeCareerContainer(bytes).databaseCandidates;
+  assert.equal(candidate.directoryBoundsPass,true);
+  assert.equal(candidate.legacyTableHeadersPass,false);
+  assert.equal(candidate.matchesCurrentParserLayout,false);
+});
