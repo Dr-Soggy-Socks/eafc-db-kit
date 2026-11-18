@@ -7,3 +7,8 @@ output/
 tests
 settings
 dev
+
+# Never publish locally copied career saves or raw save exports.
+CmMgrC*
+CmPlrC*
+fc27-save-tests/
