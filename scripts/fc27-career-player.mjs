@@ -243,7 +243,7 @@ export async function patchPotential(index, playerId, newPotential, outputPath) 
   return {
     output, player, oldPotential, newPotential, changedBytes,
     sourceHash: index.inputHash, outputHash: sha256(clone), sourceIntegrity, integrity,
-    warning: 'Experimental offline patch only. The FC27 outer CRC32 is recalculated, but career record serialization and in-game loading/persistence are not yet validated; do not replace your original career save.',
+    warning: 'Experimental offline patch only. The six-field Ngumoha test passed in-game save/reload; this single-potential path and other players/fields are not broadly validated. Do not replace your original career save.',
   };
 }
 export async function main(argv) {

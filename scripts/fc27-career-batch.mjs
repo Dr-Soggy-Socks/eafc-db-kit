@@ -183,7 +183,7 @@ export async function patchBatch(index, playerId, changes, outputPath, options =
   return {
     player: { id: preview.player.id, name: preview.player.name },
     edits, changedBytes, titleChange, integrity, sourceIntegrity, output, sourceHash: index.inputHash, outputHash: sha256(outputBytes),
-    notice: 'The FC27 outer CRC32 is recalculated. Career record serialization and in-game acceptance/persistence are NOT yet proven.',
+    notice: 'The six supported fields passed an in-game save/reload test on Ngumoha. Other players, attributes and career record variants remain unvalidated.',
   };
 }
 

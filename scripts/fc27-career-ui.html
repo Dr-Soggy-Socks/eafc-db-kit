@@ -61,12 +61,12 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
   <p>Inspect real player records in an offline FC27 career save, edit six verified attributes, and create one separate test copy.</p>
   <div class="badges">
     <span class="tag">OFFLINE COPY ONLY</span>
-    <span class="tag yellow">NOT GAME-VALIDATED</span>
+    <span class="tag yellow">SIX-FIELD TEST PASSED</span>
     <span class="tag gray" id="count">Loading player records...</span>
   </div>
 </header>
 <main>
-  <div class="warning"><strong>⚠️ Experimental build.</strong> This tool does not modify a running game or its active save. It can batch-edit six independently validated player attributes in a NEW offline copy. The FC27 outer CRC32 is recalculated, but career serialization and in-game acceptance are still unverified. Keep your original career save.</div>
+  <div class="warning"><strong>⚠️ Experimental build.</strong> This tool edits a NEW offline copy; it does not modify a running game. The Ngumoha test confirmed all six supported fields in-game and after save/reload. Complete player discovery, generated players, and other attributes are not yet validated. Keep your original career save.</div>
   <div class="layout">
     <section class="panel">
       <h2>Player catalogue</h2>
@@ -94,7 +94,7 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
           <div id="fields" class="attribute-grid"></div>
           <button class="secondary" id="preset" type="button" hidden>Fill Ngumoha six-attribute test preset</button>
           <button class="action" id="create" disabled>Create multi-attribute test save</button>
-          <div class="note">Creates a distinct <strong>CmMgrCTest-Batch-*</strong> file in the offline test folder. It does not overwrite career saves. Game acceptance and persistence remain unverified; overall rating and other unvalidated fields are deliberately excluded.</div>
+          <div class="note">Creates a distinct <strong>CmMgrCTest-Batch-*</strong> file in the offline test folder. It does not overwrite career saves. The six Ngumoha fields passed one in-game save/reload test; other players and fields remain unvalidated. Overall rating and other unvalidated fields are deliberately excluded.</div>
           <div class="result" id="result" role="status"></div>
         </div>
       </div>

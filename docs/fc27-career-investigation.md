@@ -1,6 +1,6 @@
 # FC 27 Manager Career format investigation
 
-Status: **Read-only research; real FC 27 career save is not yet supported.**
+Status: **A six-field save edit has been accepted and persisted in FC 27 on one template-backed player. Full player discovery and a Live Editor-style runtime overlay remain future work.**
 
 Branch: `feature/fc27-career-container-readonly`
 
@@ -170,7 +170,7 @@ The first in-game test of the six-attribute copy was rejected by FC27 as damaged
 
 Three untouched FC27 Manager Career snapshots independently confirm the same container rule:
 
-- `SaveType_Career ` begins at byte **1126**.
+- `SaveType_Career\0` begins at byte **1126**.
 - A UInt32 little-endian CRC32 is stored at byte **1142**.
 - The stored value exactly equals standard CRC32 over bytes **1174 through EOF**.
 
@@ -180,4 +180,22 @@ A corrected offline copy was produced by changing **only bytes 1142–1145** to 
 
 The FC27-specific patchers now validate the source CRC before editing and recalculate this four-byte field after writing player attributes. Synthetic regression tests cover validation, rejection of stale CRCs, recalculation and preservation of all other bytes. Do **not** use the generic 16-byte invalidation ranges from the upstream EA FC writer: those ranges overlap FC27 Career chunk metadata and are not equivalent to this CRC field.
 
-**Still unresolved:** this fixes the proven outer CRC mismatch only. It does not prove that the variable-length player record is safely writable, that no additional inner integrity values exist, or that FC27 will accept and persist the edited career. The next controlled test must use only the corrected separate test slot after the game is fully closed; the original career must remain untouched.
+**Still unresolved at this checkpoint:** full variable-length player-record framing, generated-player discovery, and broad editing across arbitrary records/fields. The subsequent in-game validation is recorded below.
+
+
+## Seventh checkpoint — six-field edit accepted and persisted in FC27 (19 November 2026)
+
+The corrected, separately named test slot `Career – NGUMOHA TEST POT99` loaded successfully in FC27. The user inspected Rio Ngumoha (player ID 80376) and confirmed all six requested values:
+
+| Field | Original | Patched | In-game |
+| --- | ---: | ---: | ---: |
+| Potential | 88 | 99 | 99 |
+| Sprint speed | 89 | 99 | 99 |
+| Finishing | 72 | 90 | 90 |
+| Shot power | 74 | 95 | 95 |
+| Dribbling | 80 | 95 | 95 |
+| Strength | 44 | 75 | 75 |
+
+The user then saved the career in-game, fully exited FC27, reloaded the same slot and confirmed that the edits persisted. This validates the outer CRC32 repair and the six tested attribute writes for this reference-backed player in this test career.
+
+It does **not** yet validate a complete career player parser, generated academy/regenerated/created players, all 152 player fields, contracts, transfers, injuries, or arbitrary player records. The existing scanner still relies on template anchors and a fixed scan window. Continue with read-only full player discovery before expanding write support. Do not commit private saves or raw player exports.
