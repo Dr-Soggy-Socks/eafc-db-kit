@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FC27 Career Lab · Offline Player Inspector</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0e15;--surface:#141a26;--surface2:#1a2230;--line:#2a3546;--text:#edf5f7;--muted:#9aaebf;--aqua:#69e9ca;--warning:#f3c077;--danger:#f0999f}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top right,#162c35 0%,transparent 45%),var(--bg);font:15px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:var(--text)}
+header{padding:28px max(24px,calc((100vw - 1190px)/2));border-bottom:1px solid var(--line)}
+.logo{font-size:12px;font-weight:800;letter-spacing:.18em;color:var(--aqua);margin-bottom:10px}
+h1{font-size:clamp(25px,4vw,36px);letter-spacing:-.04em;margin:0 0 9px}
+p{margin:0;color:var(--muted)}
+.badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.tag{display:inline-flex;align-items:center;border:1px solid #315958;background:#153538;border-radius:999px;color:#b2f6e4;font-size:12px;padding:5px 12px;font-weight:700}
+.tag.yellow{border-color:#765936;background:#382e1a;color:#ffdc9f}
+.tag.gray{border-color:var(--line);background:var(--surface);color:var(--muted)}
+main{max-width:1240px;margin:auto;padding:26px 24px 60px}
+.warning{background:linear-gradient(120deg,#3b3020,#26241f);border:1px solid #735c3b;border-radius:14px;padding:16px 20px;margin-bottom:24px;color:#fff0d4}
+.warning strong{color:#ffe0ab}
+.layout{display:grid;grid-template-columns:minmax(360px,1.25fr) minmax(320px,.9fr);gap:22px;align-items:start}
+.panel{border:1px solid var(--line);background:rgba(20,26,38,.96);border-radius:18px;padding:20px;box-shadow:0 9px 24px #0002}
+.panel h2{font-size:19px;margin:0 0 10px;letter-spacing:-.02em}
+.meta{font-size:12px;color:var(--muted)}
+.search{display:block;width:100%;padding:14px 16px;background:var(--bg);color:var(--text);border:1px solid #384758;border-radius:11px;font:inherit;outline:none;margin:18px 0 12px}
+.search:focus,input[type=number]:focus{border-color:var(--aqua);box-shadow:0 0 0 3px #69e9ca17}
+.rows{max-height:580px;overflow:auto;border-top:1px solid var(--line)}
+.player{width:100%;background:transparent;color:var(--text);border:0;border-bottom:1px solid #253142;padding:13px 11px;display:flex;gap:10px;align-items:center;justify-content:space-between;text-align:left;cursor:pointer;font:inherit}
+.player:hover{background:#1d2e3b}.player.active{background:#163a39;outline:1px solid #397f71;border-radius:8px}
+.player-name{font-weight:700}.player small{display:block;color:var(--muted);margin-top:3px;font-size:12px}
+.potential{color:var(--aqua);background:#14352f;border-radius:9px;padding:6px 10px;font-weight:800;white-space:nowrap}
+.placeholder{text-align:center;color:var(--muted);padding:48px 16px}
+.section{margin:18px 0;border-top:1px solid var(--line);padding-top:18px}
+.selected-name{font-size:26px;letter-spacing:-.04em;font-weight:750;margin:9px 0 3px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.stat{border:1px solid var(--line);background:var(--surface2);border-radius:12px;padding:13px}
+.stat span{color:var(--muted);font-size:12px}.stat strong{display:block;font-size:25px;line-height:1.3}
+label{display:block;font-size:13px;color:var(--muted);font-weight:700;margin-bottom:7px}
+input[type=number]{width:100%;font:inherit;font-size:25px;font-weight:750;padding:13px 15px;border:1px solid #384758;border-radius:11px;background:var(--bg);color:var(--aqua);outline:none}
+button.action{width:100%;font:inherit;font-weight:800;cursor:pointer;border-radius:11px;background:var(--aqua);color:#08302a;border:0;padding:14px;margin-top:15px}
+button.action:hover{filter:brightness(1.08)}button.action:disabled{opacity:.35;cursor:not-allowed}
+.note{background:#202935;border-left:3px solid #6b7e93;padding:12px 14px;color:var(--muted);font-size:12px;margin-top:17px;border-radius:5px}
+.result{margin-top:17px;padding:13px 15px;border:1px solid var(--line);border-radius:11px;display:none;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.result.success{display:block;background:#15372d;border-color:#2e725a;color:#caffdd}
+.result.error{display:block;background:#3f2229;border-color:#91515c;color:#ffd3d6}
+footer{margin-top:22px;color:#8197a9;font-size:12px}
+@media(max-width:790px){.layout{grid-template-columns:1fr}header{padding:25px 24px}.panel{padding:17px}.rows{max-height:360px}main{padding:20px 15px 60px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">FC27 CAREER LAB / PROTOTYPE 01</div>
+  <h1>Offline Career Player Inspector</h1>
+  <p>Find real player records in your copied FC27 career save, inspect potential and create a separate experimental test copy.</p>
+  <div class="badges">
+    <span class="tag">OFFLINE COPY ONLY</span>
+    <span class="tag yellow">NOT GAME-VALIDATED</span>
+    <span class="tag gray" id="count">Loading player records...</span>
+  </div>
+</header>
+<main>
+  <div class="warning"><strong>⚠️ Experimental build.</strong> This tool never edits your running FC27 game or its active save. It can change one potential field in a NEW backup copy, but FC27 checksums and whether the game accepts that output have not been verified. Keep your original career save.</div>
+  <div class="layout">
+    <section class="panel">
+      <h2>Player catalogue</h2>
+      <div class="meta" id="source">Reading archive...</div>
+      <input type="search" class="search" id="search" placeholder="Search player name or ID (e.g. Bukayo Saka)" autocomplete="off">
+      <div class="meta" id="list-status">Finding verified record matches...</div>
+      <div class="rows" id="players"></div>
+    </section>
+    <section class="panel">
+      <h2>Player details</h2>
+      <div id="empty" class="placeholder">Choose a player from the list to inspect the copied save.</div>
+      <div id="editor" hidden>
+        <div class="selected-name" id="name"></div>
+        <div class="meta" id="id"></div>
+        <div class="stats">
+          <div class="stat"><span>Career potential (observed)</span><strong id="career-potential"></strong></div>
+          <div class="stat"><span>Overall (reference template)</span><strong id="template-overall"></strong></div>
+          <div class="stat"><span>Reference potential</span><strong id="template-potential"></strong></div>
+          <div class="stat"><span>Matching anchors</span><strong id="anchors"></strong></div>
+        </div>
+        <div class="section">
+          <label for="potential">New potential (1–99)</label>
+          <input id="potential" type="number" min="1" max="99" step="1">
+          <button class="action" id="create">Create separate test save</button>
+          <div class="note">We change only the potential field inside a new file named <strong>CmMgrCTest-*</strong> in your offline testing folder. The live save remains unchanged. Reference overall is not a verified live career rating.</div>
+          <div class="result" id="result" role="status"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <footer>Local-only application · FC27 reference database supplied by eafc-db-kit · No accounts, telemetry, upload or network access beyond your own computer.</footer>
+</main>
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let selected = null;
+  let latest = [];
+  let timer = null;
+  function makeRow(p) {
+    const item = document.createElement('button');
+    item.type = 'button'; item.className = 'player';
+    if (selected && selected.id === p.id) item.classList.add('active');
+    const left = document.createElement('span');
+    const title = document.createElement('span');
+    title.className = 'player-name'; title.textContent = p.name; left.appendChild(title);
+    const info = document.createElement('small');
+    info.textContent = 'ID ' + p.id + ' · ' + p.anchors + ' exact anchors';
+    left.appendChild(info);
+    const value = document.createElement('span'); value.className = 'potential';
+    value.textContent = 'POT ' + p.careerPotential;
+    item.append(left, value);
+    item.addEventListener('click', () => selectPlayer(p));
+    return item;
+  }
+  function renderRows() {
+    const box = $('players');
+    box.replaceChildren();
+    if (!latest.length) {
+      const node = document.createElement('div'); node.className = 'placeholder';
+      node.textContent = 'No matched player found. Try a different name or ID.';
+      box.appendChild(node);
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    latest.forEach(p => frag.appendChild(makeRow(p)));
+    box.appendChild(frag);
+  }
+  function selectPlayer(p) {
+    selected = p; $('empty').hidden = true; $('editor').hidden = false;
+    $('name').textContent = p.name;
+    $('id').textContent = 'Player ID ' + p.id + ' · record offset ' + p.offset;
+    $('career-potential').textContent = p.careerPotential;
+    $('template-overall').textContent = p.templateOverall;
+    $('template-potential').textContent = p.templatePotential;
+    $('anchors').textContent = p.anchors;
+    $('potential').value = Math.min(99, p.careerPotential + 1);
+    $('result').className = 'result'; $('result').textContent = '';
+    renderRows();
+  }
+  async function findPlayers() {
+    try {
+      const query = $('search').value.trim();
+      const r = await fetch('/api/players?q=' + encodeURIComponent(query), {cache:'no-store'});
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Unable to load players');
+      latest = data.results;
+      $('list-status').textContent = 'Showing ' + latest.length + ' of ' + data.totalMatched +
+        ' matched players · type to search';
+      renderRows();
+    } catch(err) {
+      $('list-status').textContent = String(err.message || err);
+    }
+  }
+  $('search').addEventListener('input', () => {
+    clearTimeout(timer);timer=setTimeout(findPlayers, 130);
+  });
+  $('create').addEventListener('click', async () => {
+    if (!selected) return;
+    const field = $('potential');
+    const potential = Number(field.value);
+    const result = $('result');
+    if (!Number.isInteger(potential) || potential < 1 || potential > 99) {
+      result.textContent = 'Please enter a whole number from 1 to 99.';
+      result.className = 'result error'; return;
+    }
+    const button = $('create');
+    button.disabled = true; button.textContent = 'Creating and checking copy...';
+    try {
+      const r = await fetch('/api/patch', {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:selected.id,potential})});
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Could not create test copy');
+      result.className = 'result success';
+      result.textContent = '✓ New OFFLINE test copy created.\n\nPlayer: ' + data.result.player.name +
+        '\nPotential: ' + data.result.oldPotential + ' → ' + data.result.newPotential +
+        '\nChanged bytes: ' + data.result.changedBytes +
+        '\n\nFile: ' + data.result.output +
+        '\n\nNext: verify game-load behavior separately; do not replace the original save.';
+    } catch(err) {
+      result.className = 'result error';result.textContent = String(err.message || err);
+    } finally {
+      button.disabled = false;button.textContent = 'Create separate test save';
+    }
+  });
+  Promise.all([
+    fetch('/api/status', {cache:'no-store'}).then(r=>r.json()),
+    findPlayers(),
+  ]).then(results => {
+    const status = results[0];
+    $('source').textContent = 'Archive: ' + status.source;
+    $('count').textContent = status.matched.toLocaleString() + ' player matches';
+  }).catch(err => $('source').textContent = String(err.message || err));
+}());
+</script>
+</body>
+</html>
