@@ -40,6 +40,12 @@ label{display:block;font-size:13px;color:var(--muted);font-weight:700;margin-bot
 input[type=number]{width:100%;font:inherit;font-size:25px;font-weight:750;padding:13px 15px;border:1px solid #384758;border-radius:11px;background:var(--bg);color:var(--aqua);outline:none}
 button.action{width:100%;font:inherit;font-weight:800;cursor:pointer;border-radius:11px;background:var(--aqua);color:#08302a;border:0;padding:14px;margin-top:15px}
 button.action:hover{filter:brightness(1.08)}button.action:disabled{opacity:.35;cursor:not-allowed}
+.attribute-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.attribute{border:1px solid var(--line);padding:12px;background:#172330;border-radius:12px}
+.attribute small{display:block;color:var(--muted);font-size:11px;margin:0 0 9px}
+.attribute input[type=number]{font-size:21px;padding:9px 10px}
+button.secondary{margin-top:14px;padding:9px 13px;background:#263a45;color:#c7e9e6;border:1px solid #456470;border-radius:9px;cursor:pointer;font:inherit;font-size:13px}
+button.secondary:disabled{opacity:.4;cursor:not-allowed}
 .note{background:#202935;border-left:3px solid #6b7e93;padding:12px 14px;color:var(--muted);font-size:12px;margin-top:17px;border-radius:5px}
 .result{margin-top:17px;padding:13px 15px;border:1px solid var(--line);border-radius:11px;display:none;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .result.success{display:block;background:#15372d;border-color:#2e725a;color:#caffdd}
@@ -52,7 +58,7 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
 <header>
   <div class="logo">FC27 CAREER LAB / PROTOTYPE 01</div>
   <h1>Offline Career Player Inspector</h1>
-  <p>Find real player records in your copied FC27 career save, inspect potential and create a separate experimental test copy.</p>
+  <p>Inspect real player records in an offline FC27 career save, edit six verified attributes, and create one separate test copy.</p>
   <div class="badges">
     <span class="tag">OFFLINE COPY ONLY</span>
     <span class="tag yellow">NOT GAME-VALIDATED</span>
@@ -60,7 +66,7 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
   </div>
 </header>
 <main>
-  <div class="warning"><strong>⚠️ Experimental build.</strong> This tool never edits your running FC27 game or its active save. It can change one potential field in a NEW backup copy, but FC27 checksums and whether the game accepts that output have not been verified. Keep your original career save.</div>
+  <div class="warning"><strong>⚠️ Experimental build.</strong> This tool does not modify a running game or its active save. It can batch-edit six independently validated player attributes in a NEW offline copy. FC27 save integrity and in-game acceptance are still unverified. Keep your original career save.</div>
   <div class="layout">
     <section class="panel">
       <h2>Player catalogue</h2>
@@ -82,10 +88,13 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
           <div class="stat"><span>Matching anchors</span><strong id="anchors"></strong></div>
         </div>
         <div class="section">
-          <label for="potential">New potential (1–99)</label>
-          <input id="potential" type="number" min="1" max="99" step="1">
-          <button class="action" id="create">Create separate test save</button>
-          <div class="note">We change only the potential field inside a new file named <strong>CmMgrCTest-*</strong> in your offline testing folder. The live save remains unchanged. Reference overall is not a verified live career rating.</div>
+          <h2>Verified attribute editor</h2>
+          <p class="meta">Six fields verified in the stable player-record prefix. Unchanged values are preserved; unsupported fields are excluded.</p>
+          <div id="field-status" class="meta">Select a player to load editable attributes.</div>
+          <div id="fields" class="attribute-grid"></div>
+          <button class="secondary" id="preset" type="button" hidden>Fill Ngumoha six-attribute test preset</button>
+          <button class="action" id="create" disabled>Create multi-attribute test save</button>
+          <div class="note">Creates a distinct <strong>CmMgrCTest-Batch-*</strong> file in the offline test folder. It does not overwrite career saves. Game acceptance and persistence remain unverified; overall rating and other unvalidated fields are deliberately excluded.</div>
           <div class="result" id="result" role="status"></div>
         </div>
       </div>
@@ -100,6 +109,28 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
   let selected = null;
   let latest = [];
   let timer = null;
+  let selectedFieldPreview = null;
+  let proposedTitle = null;
+  let selectionVersion = 0;
+  const labels = {potential:'Potential',sprintspeed:'Sprint speed',
+    finishing:'Finishing',shotpower:'Shot power',dribbling:'Dribbling',strength:'Strength'};
+  const ngumohaPreset = {potential:99,sprintspeed:99,finishing:90,
+    shotpower:95,dribbling:95,strength:75};
+  function renderFields(preview) {
+    const box = $('fields');box.replaceChildren();
+    for (const [name, data] of Object.entries(preview.fields)) {
+      const wrapper = document.createElement('div');wrapper.className='attribute';
+      const label = document.createElement('label');label.textContent=labels[name] || name;
+      label.htmlFor='edit-'+name;
+      const old = document.createElement('small');
+      old.textContent='Career '+data.careerValue+' · template '+data.templateValue+
+        (data.writable?'':' · inspection only');
+      const input = document.createElement('input');
+      input.type='number';input.id='edit-'+name;input.min='1';input.max='99';input.step='1';
+      input.value=data.careerValue;input.disabled=!data.writable;input.dataset.field=name;
+      wrapper.append(label,old,input);box.appendChild(wrapper);
+    }
+  }
   function makeRow(p) {
     const item = document.createElement('button');
     item.type = 'button'; item.className = 'player';
@@ -130,22 +161,37 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
     box.appendChild(frag);
   }
   function selectPlayer(p) {
-    selected = p; $('empty').hidden = true; $('editor').hidden = false;
+    const version = ++selectionVersion;
+    selected = p; selectedFieldPreview = null; proposedTitle = null;
+    $('empty').hidden = true; $('editor').hidden = false;
     $('name').textContent = p.name;
     $('id').textContent = 'Player ID ' + p.id + ' · record offset ' + p.offset;
     $('career-potential').textContent = p.careerPotential;
     $('template-overall').textContent = p.templateOverall;
     $('template-potential').textContent = p.templatePotential;
     $('anchors').textContent = p.anchors;
-    $('potential').value = Math.min(99, p.careerPotential + 1);
-    const editable = p.anchors >= 3 && p.careerPotential === p.templatePotential;
-    $('create').disabled = !editable;
-    $('create').title = editable ? 'Create experimental offline copy' :
-      'Inspection only: this player cannot be safely patched with current evidence.';
-    $('result').className = editable ? 'result' : 'result error';
-    $('result').textContent = editable ? '' :
-      'Inspection only: not enough independent matching evidence to create an edit.';
+    $('fields').replaceChildren();
+    $('field-status').textContent = 'Checking verified fields...';
+    $('create').disabled = true;
+    $('preset').hidden = p.id !== 80376; $('preset').disabled = true;
+    $('result').className = 'result'; $('result').textContent = '';
     renderRows();
+    fetch('/api/fields?id=' + encodeURIComponent(p.id), {cache:'no-store'})
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Unable to inspect attributes');
+        return data;
+      }).then(data => {
+        if (version !== selectionVersion) return;
+        selectedFieldPreview = data; renderFields(data);
+        const writable = Object.values(data.fields).filter(x=>x.writable).length;
+        $('field-status').textContent = writable + ' of 6 attributes editable in this save';
+        $('create').disabled = writable === 0;
+        $('preset').disabled = writable !== 6;
+      }).catch(err => {
+        if (version !== selectionVersion) return;
+        $('field-status').textContent = String(err.message || err);
+      });
   }
   async function findPlayers() {
     try {
@@ -164,32 +210,53 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
   $('search').addEventListener('input', () => {
     clearTimeout(timer);timer=setTimeout(findPlayers, 130);
   });
+  $('preset').addEventListener('click', () => {
+    if (selected?.id !== 80376 || !selectedFieldPreview) return;
+    for (const [name, value] of Object.entries(ngumohaPreset)) {
+      const input = $('edit-'+name);
+      if (input && !input.disabled) input.value = value;
+    }
+    proposedTitle = 'Career – NGUMOHA TEST POT99';
+    $('field-status').textContent = 'Six changes filled in. The test save will have a distinct in-game name.';
+  });
   $('create').addEventListener('click', async () => {
-    if (!selected) return;
-    const field = $('potential');
-    const potential = Number(field.value);
+    if (!selected || !selectedFieldPreview) return;
     const result = $('result');
-    if (!Number.isInteger(potential) || potential < 1 || potential > 99) {
-      result.textContent = 'Please enter a whole number from 1 to 99.';
-      result.className = 'result error'; return;
+    const changes = {};
+    for (const [name, spec] of Object.entries(selectedFieldPreview.fields)) {
+      const input = $('edit-'+name);
+      if (!input || input.disabled) continue;
+      const target = Number(input.value);
+      if (!Number.isInteger(target) || target < 1 || target > 99) {
+        result.className = 'result error';
+        result.textContent = (labels[name] || name) + ' must be a whole number from 1 to 99.';
+        return;
+      }
+      if (target !== spec.careerValue) changes[name] = target;
+    }
+    if (!Object.keys(changes).length) {
+      result.className = 'result error';
+      result.textContent = 'Change at least one attribute before creating a test copy.';
+      return;
     }
     const button = $('create');
-    button.disabled = true; button.textContent = 'Creating and checking copy...';
+    button.disabled = true; button.textContent = 'Creating and verifying all edits...';
     try {
-      const r = await fetch('/api/patch', {method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:selected.id,potential})});
+      const r = await fetch('/api/batch', {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:selected.id,changes,inGameName:proposedTitle || undefined})});
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Could not create test copy');
+      if (!r.ok) throw new Error(data.error || 'Could not create batch copy');
       result.className = 'result success';
-      result.textContent = '✓ New OFFLINE test copy created.\n\nPlayer: ' + data.result.player.name +
-        '\nPotential: ' + data.result.oldPotential + ' → ' + data.result.newPotential +
+      result.textContent = '✓ New OFFLINE batch created.\n\nPlayer: ' + data.result.player.name +
+        '\n' + data.result.edits.map(e => (labels[e.name] || e.name) +
+          ': ' + e.from + ' → ' + e.to).join('\n') +
         '\nChanged bytes: ' + data.result.changedBytes +
         '\n\nFile: ' + data.result.output +
-        '\n\nNext: verify game-load behavior separately; do not replace the original save.';
+        '\n\nGame acceptance and persistence still require one in-game test.';
     } catch(err) {
-      result.className = 'result error';result.textContent = String(err.message || err);
+      result.className = 'result error'; result.textContent = String(err.message || err);
     } finally {
-      button.disabled = false;button.textContent = 'Create separate test save';
+      button.disabled = false; button.textContent = 'Create multi-attribute test save';
     }
   });
   Promise.all([

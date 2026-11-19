@@ -9,6 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCareerIndex, expandPlayerMatches, patchPotential } from './fc27-career-player.mjs';
+import { inspectBatchFields, patchBatch } from './fc27-career-batch.mjs';
 
 const inputFile = process.argv[2];
 if (!inputFile) {
@@ -73,6 +74,26 @@ const server = createServer(async (req, res) => {
       const target = resolve(dirname(index.file),
         'CmMgrCTest-' + id + '-pot' + potential + '-' + Date.now());
       const result = await patchPotential(index, id, potential, target);
+      return respond(res, 200, {ok:true, result});
+    }
+    if (req.method === 'GET' && url.pathname === '/api/fields') {
+      const id = Number(url.searchParams.get('id'));
+      if (!Number.isInteger(id) || id < 1) return respond(res, 400, {error:'Invalid player ID.'});
+      expandPlayerMatches(index, String(id));
+      return respond(res, 200, await inspectBatchFields(index, id));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/batch') {
+      const origin = req.headers.origin;
+      if (origin && origin !== 'http://127.0.0.1:' + port &&
+          origin !== 'http://localhost:' + port) return respond(res, 403, {error:'Origin rejected.'});
+      const body = await jsonBody(req);
+      const id = body.id;
+      if (!Number.isInteger(id) || id < 1) return respond(res, 400, {error:'Invalid player ID.'});
+      expandPlayerMatches(index, String(id));
+      const target = resolve(dirname(index.file),
+        'CmMgrCTest-Batch-' + id + '-' + Date.now());
+      const result = await patchBatch(index, id, body.changes, target,
+        {inGameName:body.inGameName});
       return respond(res, 200, {ok:true, result});
     }
     return respond(res, 404, {error:'Not found.'});
