@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCareerIndex, patchPotential } from './fc27-career-player.mjs';
+import { buildCareerIndex, expandPlayerMatches, patchPotential } from './fc27-career-player.mjs';
 
 const inputFile = process.argv[2];
 if (!inputFile) {
@@ -56,6 +56,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/api/players') {
       const query = String(url.searchParams.get('q') ?? '').trim().toLocaleLowerCase();
+      expandPlayerMatches(index, query);
       const results = index.players.filter(p => p.name.toLocaleLowerCase().includes(query) ||
         String(p.id).includes(query)).slice(0, 100);
       return respond(res, 200, { results, totalMatched: index.players.length });
@@ -68,6 +69,7 @@ const server = createServer(async (req, res) => {
       const id = Number(body.id), potential = Number(body.potential);
       if (!Number.isInteger(id) || !Number.isInteger(potential))
         return respond(res, 400, { error: 'ID and potential must be whole numbers.' });
+      expandPlayerMatches(index, String(id));
       const target = resolve(dirname(index.file),
         'CmMgrCTest-' + id + '-pot' + potential + '-' + Date.now());
       const result = await patchPotential(index, id, potential, target);

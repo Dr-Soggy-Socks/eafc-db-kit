@@ -38,16 +38,17 @@ The patch command **refuses** to write outside a directory called fc27-save-test
 6. Read a potential field from bit **370**, 7 bits wide, with an offset of **+1**. When patching, require the saved original potential to equal the reference template value.
 7. Change only that bit field in a new copy, re-read it from disk, and ensure no more than two bytes differ. Verify the original source SHA-256 is unchanged.
 
-The matching approach does **not** resolve youth/generated players, staff, team memberships, contracts, or transfers. A successful in-memory edit is not proof of in-game persistence.
+A more detailed targeted lookup can recover reference-listed players missed by the primary scan using three nonoverlapping 12-byte exact anchors. If a previously edited field breaks an anchor, two anchors may still support **inspection only**, not another edit. The matching approach does **not** resolve randomly generated academy players, staff, team memberships, contracts, or transfers. A successful in-memory edit is not proof of in-game persistence.
 
 ## Verified results on offline archives (2026-11-19)
 
 - Later archived save: **8,085** candidate players identified from **21,623** reference player rows.
 - Earlier archived save: **8,958** candidate players identified.
-- Known candidates in the later archive include Bukayo Saka, Kylian Mbappé and Alexander Isak. All three had four exact anchors.
+- Known candidates in the later archive include Bukayo Saka, Kylian Mbappé and Alexander Isak. All three had four exact anchors. A targeted fallback also identified **Rio Ngumoha (ID 80376, OVR 75, POT 88)** with three independent 12-byte anchors, agreeing with the game UI.
 - An offline copy changing **Bukayo Saka (246669)** from **89** to **95** was written. Exactly **one byte** differed. Re-reading the output with the same scanner returned **95**.
 - The archived input hash stayed unchanged. The active Career Mode save and FC27 process were never touched.
-- Synthetic tests for bit-field reading and writing: **4 passed**.
+- A second offline test changed Ngumoha's potential from **88 to 99**, with **one changed byte**. A targeted read of that patched copy recovered **99** with two remaining anchors (inspection-only). No in-game validation yet.
+- Synthetic tests for bit-field reading, writing, and targeted lookup: **5 passed**.
 
 **Unvalidated:** FC27 internal checksums; the game's acceptance of the modified career container; changed potential displayed in the game; whether the change persists after a game save. Never treat this build as a replacement for Live Editor until those checks pass.
 

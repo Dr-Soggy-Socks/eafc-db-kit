@@ -138,7 +138,13 @@ footer{margin-top:22px;color:#8197a9;font-size:12px}
     $('template-potential').textContent = p.templatePotential;
     $('anchors').textContent = p.anchors;
     $('potential').value = Math.min(99, p.careerPotential + 1);
-    $('result').className = 'result'; $('result').textContent = '';
+    const editable = p.anchors >= 3 && p.careerPotential === p.templatePotential;
+    $('create').disabled = !editable;
+    $('create').title = editable ? 'Create experimental offline copy' :
+      'Inspection only: this player cannot be safely patched with current evidence.';
+    $('result').className = editable ? 'result' : 'result error';
+    $('result').textContent = editable ? '' :
+      'Inspection only: not enough independent matching evidence to create an edit.';
     renderRows();
   }
   async function findPlayers() {

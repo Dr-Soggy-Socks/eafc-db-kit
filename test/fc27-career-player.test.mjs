@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readBits, writeBits } from '../scripts/fc27-career-player.mjs';
+import { readBits, writeBits, expandPlayerMatches } from '../scripts/fc27-career-player.mjs';
 
 test('FC27 career potential bits read and change without disturbing neighbors', () => {
   const bytes = Buffer.from([0xff, 0xff, 0x7f, 0x5a, 0x01, 0x23, 0x45]);
@@ -35,4 +35,30 @@ test('bit encoder round trips every value in a 7-bit field', () => {
     writeBits(bytes, 13, 7, i);
     assert.equal(readBits(bytes, 13, 7), i);
   }
+});
+
+test('targeted FC27 fallback locates an otherwise unknown player uniquely', () => {
+  const refStart = 1219340;
+  const reference = Buffer.alloc(refStart + 156);
+  for (let i = 0; i < 120; i++) reference[refStart + i] = (i * 59 + (i * i * 13)) & 255;
+  writeBits(reference, refStart * 8 + 370, 7, 87);
+  const career = Buffer.alloc(4000);
+  reference.copy(career, 512, refStart, refStart + 112);
+  // These changed bytes defeat some full-prefix anchors but leave three distinct
+  // 12-byte fragments matched in the same physical record.
+  for (let i = 0; i < 18; i++) career[512 + i] ^= 0xaa;
+  for (let i = 76; i < 80; i++) career[512 + i] ^= 0x7f;
+  const index = {
+    reference, career, catalog: [{
+      j: 0, id: 80376, name: 'Rio Ngumoha', templateOverall: 75, templatePotential: 88,
+    }],
+    triedIds: new Set(), players: [], scanStart: 200, scanEnd: 3800,
+  };
+  const added = expandPlayerMatches(index, 'Ngumoha');
+  assert.equal(added.length, 1);
+  assert.equal(added[0].id, 80376);
+  assert.equal(added[0].offset, 512);
+  assert.equal(added[0].careerPotential, 88);
+  assert.ok(added[0].anchors >= 3);
+  assert.equal(expandPlayerMatches(index, '80376').length, 0);
 });

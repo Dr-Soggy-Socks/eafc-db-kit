@@ -132,9 +132,80 @@ export async function buildCareerIndex(filePath) {
     });
   }
   players.sort((a, b) => a.name.localeCompare(b.name));
-  return { file, career, players, inputHash: sha256(career), scanned: knownTemplateRows,
+  const catalog = playerTable.records.map((row, j) => ({
+    id: row.playerid, j, name: [names.get(row.firstnameid), names.get(row.lastnameid)]
+      .filter(Boolean).join(' ').trim() || 'Player #' + row.playerid,
+    templateOverall: row.overallrating, templatePotential: row.potential,
+  }));
+  return { file, career, players, reference, catalog, triedIds: new Set(),
+    inputHash: sha256(career), scanned: knownTemplateRows,
     scanStart, scanEnd,
     notice: 'Experimental matching: career player IDs inferred from matching FC27 template record prefixes; overall is a TEMPLATE rating, not verified live career overall.' };
+}
+/**
+ * Targeted, bounded fallback for players with too few 16-byte anchors.
+ * Requires three nonoverlapping 12-byte exact fragments, a strong 80-byte
+ * similarity score, unique location, and matching potential.
+ * Does not claim to recover generated academy players absent from the template.
+ */
+export function expandPlayerMatches(index, query) {
+  const phrase = String(query ?? '').trim().toLocaleLowerCase();
+  if (phrase.length < 4) return [];
+  const targets = index.catalog.filter(row => row.name.toLocaleLowerCase().includes(phrase) ||
+    String(row.id) === phrase);
+  if (targets.length > 6) return []; // Avoid broad and expensive exploratory scans.
+  const result = [];
+  for (const target of targets) {
+    if (index.players.some(row => row.id === target.id) || index.triedIds.has(target.id)) continue;
+    index.triedIds.add(target.id);
+    const refStart = recordsStart + target.j * recordsStride;
+    const candidates = new Map();
+    for (let off = 0; off <= 76; off += 2) {
+      const fragment = index.reference.subarray(refStart + off, refStart + off + 12);
+      if (new Set(fragment).size < 6 || fragment.filter(value => value === 0).length >= 7) continue;
+      let pos = index.career.indexOf(fragment, index.scanStart);
+      while (pos !== -1 && pos <= index.scanEnd) {
+        const start = pos - off;
+        if (start >= index.scanStart && start + 96 < index.scanEnd) {
+          let exactOffsets = candidates.get(start);
+          if (!exactOffsets) candidates.set(start, exactOffsets = new Set());
+          exactOffsets.add(off);
+        }
+        pos = index.career.indexOf(fragment, pos + 1);
+      }
+    }
+    const plausible = [];
+    for (const [start, offsets] of candidates) {
+      let last = -12, nonoverlap = 0;
+      for (const off of [...offsets].sort((a, b) => a - b)) {
+        if (off >= last + 12) {nonoverlap++;last = off;}
+      }
+      if (nonoverlap < 2) continue;
+      let same = 0;
+      for (let i = 0; i < 80; i++) same += index.career[start + i] ===
+        index.reference[refStart + i] ? 1 : 0;
+      if (same < 50) continue;
+      const potential = readBits(index.career, start * 8 + potentialBit, potentialDepth) + 1;
+      // Two independent matches can support inspection of an already edited
+      // potential, but patchPotential still requires at least three anchors.
+      plausible.push({start, nonoverlap, same, potential});
+    }
+    plausible.sort((a, b) => b.nonoverlap - a.nonoverlap || b.same - a.same);
+    const winner = plausible[0], runnerUp = plausible[1];
+    if (!winner || (runnerUp && runnerUp.nonoverlap === winner.nonoverlap &&
+        runnerUp.same >= winner.same - 5)) continue;
+    const player = {
+      id: target.id, name: target.name,
+      templateOverall: target.templateOverall, templatePotential: target.templatePotential,
+      careerPotential: winner.potential,
+      anchors: winner.nonoverlap, anchorWidth: 12,
+      prefixMatched: winner.same, offset: winner.start,
+    };
+    index.players.push(player);
+    result.push(player);
+  }
+  if (result.length) index.players.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
 }
 export async function patchPotential(index, playerId, newPotential, outputPath) {
   if (!Number.isInteger(playerId) || !Number.isInteger(newPotential) ||
@@ -178,6 +249,7 @@ export async function main(argv) {
     throw new Error('Usage: node scripts/fc27-career-player.mjs list|inspect|patch <offline-CmMgr-save> [query|player-id] [potential] [output]');
   }
   const index = await buildCareerIndex(input);
+  expandPlayerMatches(index, action === 'list' ? (args[0] ?? '') : String(args[0] ?? ''));
   if (action === 'list') {
     const query = (args[0] ?? '').toLowerCase();
     const filtered = index.players.filter(p => p.name.toLowerCase().includes(query) || String(p.id) === query).slice(0, 60);
