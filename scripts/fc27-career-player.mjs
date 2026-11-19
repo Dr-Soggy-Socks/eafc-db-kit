@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { readTemplateDatabase } from '../dist/index.js';
 import { XMLParser } from 'fast-xml-parser';
 import { findCompactFieldBlocks } from './fc27-compact-fields.mjs';
+import { assertValidFc27CareerCrc, refreshFc27CareerCrc } from './fc27-career-integrity.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const recordsStart = 1219340;
@@ -221,6 +222,7 @@ export async function patchPotential(index, playerId, newPotential, outputPath) 
     throw new Error('Player not uniquely and confidently matched; refusing edit.');
   }
   const player = found[0];
+  const sourceIntegrity = assertValidFc27CareerCrc(index.career);
   const bit = player.offset * 8 + potentialBit;
   const oldPotential = readBits(index.career, bit, potentialDepth) + 1;
   if (oldPotential !== player.templatePotential) throw new Error('Potential differs from validated template; unsupported career edit.');
@@ -230,7 +232,8 @@ export async function patchPotential(index, playerId, newPotential, outputPath) 
   if (readBits(clone, bit, potentialDepth) + 1 !== newPotential) throw new Error('Patch failed readback.');
   let changedBytes = 0;
   for (let i = 0; i < clone.length; i++) if (clone[i] !== index.career[i]) changedBytes++;
-  if (changedBytes < 1 || changedBytes > 2) throw new Error('Changed more bytes than expected.');
+  if (changedBytes < 1 || changedBytes > 2) throw new Error('Changed more player-data bytes than expected.');
+  const integrity = refreshFc27CareerCrc(clone);
   // We deliberately never target an active game prefix or overwrite an existing file.
   await writeFile(output, clone, { flag: 'wx', mode: 0o600 });
   const check = await readFile(output);
@@ -239,8 +242,8 @@ export async function patchPotential(index, playerId, newPotential, outputPath) 
   if (sha256(sourceCurrent) !== index.inputHash) throw new Error('Source changed while writing; do not use output.');
   return {
     output, player, oldPotential, newPotential, changedBytes,
-    sourceHash: index.inputHash, outputHash: sha256(clone),
-    warning: 'Experimental offline patch only. FC27 save integrity/checksums and in-game loading are not yet validated; do not replace your original career save.',
+    sourceHash: index.inputHash, outputHash: sha256(clone), sourceIntegrity, integrity,
+    warning: 'Experimental offline patch only. The FC27 outer CRC32 is recalculated, but career record serialization and in-game loading/persistence are not yet validated; do not replace your original career save.',
   };
 }
 export async function main(argv) {

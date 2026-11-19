@@ -162,3 +162,22 @@ Read-only scan results for the later offline snapshot:
 Next research steps: (1) turn the anchor scanner into a deterministic testable reader accepting offline file paths; (2) establish complete row boundaries and validate a high-confidence player ID and rating against an in-game observation; (3) confirm data changes in controlled offline snapshots; (4) only then create a reversible no-op writer on a separate test save.
 
 This note contains research statistics and offsets only. **Never upload private save bytes to GitHub.**
+
+
+## Sixth investigation checkpoint — FC27 Career outer CRC32 identified (19 November 2026)
+
+The first in-game test of the six-attribute copy was rejected by FC27 as damaged. The game folder's original career save was verified byte-for-byte against its offline archive; it remains unchanged.
+
+Three untouched FC27 Manager Career snapshots independently confirm the same container rule:
+
+- `SaveType_Career ` begins at byte **1126**.
+- A UInt32 little-endian CRC32 is stored at byte **1142**.
+- The stored value exactly equals standard CRC32 over bytes **1174 through EOF**.
+
+The six-attribute test retained the source CRC `0x903920fd`, while the modified payload calculated to `0x1fe02f97`. The raw patcher had never updated this field. This explains the damaged-save warning at the container-integrity level.
+
+A corrected offline copy was produced by changing **only bytes 1142–1145** to the recalculated CRC32. The player edits and same-length title are unchanged. It has not yet been loaded in-game.
+
+The FC27-specific patchers now validate the source CRC before editing and recalculate this four-byte field after writing player attributes. Synthetic regression tests cover validation, rejection of stale CRCs, recalculation and preservation of all other bytes. Do **not** use the generic 16-byte invalidation ranges from the upstream EA FC writer: those ranges overlap FC27 Career chunk metadata and are not equivalent to this CRC field.
+
+**Still unresolved:** this fixes the proven outer CRC mismatch only. It does not prove that the variable-length player record is safely writable, that no additional inner integrity values exist, or that FC27 will accept and persist the edited career. The next controlled test must use only the corrected separate test slot after the game is fully closed; the original career must remain untouched.

@@ -54,7 +54,7 @@ The batch writer:
 
 The targeted Liverpool test edits Ngumoha (ID 80376) in one pass: potential **88→99**, sprint speed **89→99**, finishing **72→90**, shot power **74→95**, dribbling **80→95**, and strength **44→75**. The attribute edits touch **8 bytes**. A separately titled test copy reads `Career – NGUMOHA TEST POT99` in its header; both title strings are 29 UTF-8 bytes.
 
-**Save-integrity caution:** the upstream writer describes fixed `FBCHUNKS` integrity areas for some editions. We have **not** applied this invalidation to FC27 because one claimed integrity range at byte 218 contains readable career metadata in our real save. The game's acceptance of a raw edited save still needs a controlled test.
+**FC27 outer integrity:** three untouched career snapshots confirm that the UInt32 LE at byte `1142` is the standard CRC32 of bytes `[1174, EOF)`. The FC27 patchers now validate the source CRC and recalculate only this four-byte field after edits. Do not apply the generic 16-byte invalidation ranges from the upstream writer: they overlap FC27 career metadata. This CRC repair does not prove that the variable-length player-record edits are structurally valid or accepted by the game.
 
 ## Verified results on offline archives (2026-11-19)
 
@@ -66,12 +66,12 @@ The targeted Liverpool test edits Ngumoha (ID 80376) in one pass: potential **88
 - A second offline test changed Ngumoha's potential from **88 to 99**, with **one changed byte**. A targeted read of that patched copy recovered **99** with two remaining anchors (inspection-only). No in-game validation yet.
 - Fresh Liverpool manager career snapshot `CmMgrC20261119062605986`: **20,845** candidate players found. Rio Ngumoha matched uniquely (ID **80376**, template OVR **75**, saved potential **88**, four 16-byte anchors, offset **1,498,605**).
 - Independently generated test file `CmMgrCTest-Liverpool-Ngumoha-pot99-20261119` changed only **one byte**, left the archived source SHA-256 intact, and decoded as **99** on fresh readback. The local browser API also successfully produced its own distinct one-byte patch file from this snapshot.
-- Focused synthetic tests for batch editing, field validation, header titles, bit fields, metadata variants and targeted lookup: **14 passed**.
+- Full automated suite after the FC27 CRC fix: **193 passed, 0 failed, 4 skipped**; generated-type checks and TypeScript checks also pass.
 
-**Unvalidated:** FC27 internal checksums; the game's acceptance of the modified career container; changed potential displayed in the game; whether the change persists after a game save. Never treat this build as a replacement for Live Editor until those checks pass.
+**Unvalidated:** any additional inner integrity fields; exact variable-length career player-record serialization; the game's acceptance of the CRC-corrected container; changed attributes displayed in-game; and persistence after a game save. Never treat this build as a replacement for Live Editor until those checks pass.
 
 ## Next controlled game-load test (user present)
 
-Keep original career saves backed up. Finish any active session, close FC27, and use a **disposable test career/save slot**. First verify that a byte-for-byte identical renamed copy loads in the game, then test a single-field modified copy under a game-recognizable test filename in that disposable slot. Do not overwrite an actual career save. If FC27 reports a damaged save, stop and investigate container integrity before any further changes.
+The first six-attribute test was rejected as damaged because its outer CRC32 was stale. A corrected copy now updates only the CRC field at byte 1142 and preserves the title, player edits, and adjacent metadata. After FC27 is fully closed, replace only the separate test slot with this corrected copy and retry. Do not overwrite the original career save. If FC27 still reports damage, stop and investigate additional integrity fields and record framing before further edits.
 
-A successful display check must be followed by saving the disposable career and reading the saved potential back. Until then this is a local editor prototype, not a validated in-game Career Mode editor.
+A successful display check must be followed by saving the disposable career, closing the game, and reading the saved attributes back. Until both loading and persistence pass, this remains a local editor prototype, not a validated in-game Career Mode editor.

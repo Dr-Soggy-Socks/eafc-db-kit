@@ -11,6 +11,7 @@ import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readTemplateDatabase } from '../dist/index.js';
 import { buildCareerIndex, expandPlayerMatches, readBits, writeBits } from './fc27-career-player.mjs';
+import { assertValidFc27CareerCrc, refreshFc27CareerCrc } from './fc27-career-integrity.mjs';
 
 const expectedOffsets = Object.freeze({
   potential: 370,
@@ -146,6 +147,7 @@ export async function patchBatch(index, playerId, changes, outputPath, options =
       !basename(output).startsWith('CmMgrCTest-Batch-') || source === output) {
     throw new Error('Output must be a NEW CmMgrCTest-Batch-* file beside the offline archive.');
   }
+  const sourceIntegrity = assertValidFc27CareerCrc(index.career);
   const preview = await inspectBatchFields(index, playerId);
   if (preview.player.anchors < 3 || preview.player.prefixMatched < 40) {
     throw new Error('Not enough matching player anchors for a safe edit.');
@@ -165,6 +167,7 @@ export async function patchBatch(index, playerId, changes, outputPath, options =
     outputBytes = renamed.clone;
     titleChange = { from: renamed.originalTitle, to: renamed.title };
   }
+  const integrity = refreshFc27CareerCrc(outputBytes);
   await writeFile(output, outputBytes, { flag: 'wx', mode: 0o600 });
   const check = await readFile(output);
   if (!check.equals(outputBytes)) throw new Error('Output readback differed.');
@@ -179,8 +182,8 @@ export async function patchBatch(index, playerId, changes, outputPath, options =
   }
   return {
     player: { id: preview.player.id, name: preview.player.name },
-    edits, changedBytes, titleChange, output, sourceHash: index.inputHash, outputHash: sha256(outputBytes),
-    notice: 'Offline only. The game accepting and persisting these edits is NOT yet proven.',
+    edits, changedBytes, titleChange, integrity, sourceIntegrity, output, sourceHash: index.inputHash, outputHash: sha256(outputBytes),
+    notice: 'The FC27 outer CRC32 is recalculated. Career record serialization and in-game acceptance/persistence are NOT yet proven.',
   };
 }
 
