@@ -2,7 +2,7 @@
 
 **Status:** an offline backup-player lookup and single-field potential patch can now be tested in a browser. **NOT yet validated as a game-loadable Career Mode save editor.**
 
-This prototype is built from two separately archived FC27 career files and the bundled FC27 database template. It does **not** attach to, launch, inject into, or modify the running game.
+This prototype is built from separately archived FC27 career files and the bundled FC27 database template. It does **not** attach to, launch, inject into, or modify the running game.
 
 ## Start on Linux
 
@@ -32,7 +32,7 @@ The patch command **refuses** to write outside a directory called fc27-save-test
 
 1. Load the packaged FC27 reference database and its XML player-field schema.
 2. Verify selected reference rows have the expected 156-byte layout, ID, and potential bits.
-3. Locate the full 152-field players metadata block in an offline career copy.
+3. Locate the full 152-field players metadata block in an offline career copy. The fresh Liverpool save uses a previously unseen 10-byte field descriptor (depth byte, zero marker, 32-bit offset); this variant is now recognized and regression-tested.
 4. Scan a bounded region after that field block for exact, high-entropy 16-byte matching fragments of player reference rows.
 5. Require at least **three agreeing fragments**, a unique best location, and at least **40/80** identical initial bytes to map an existing player ID to a career record position.
 6. Read a potential field from bit **370**, 7 bits wide, with an offset of **+1**. When patching, require the saved original potential to equal the reference template value.
@@ -48,7 +48,9 @@ A more detailed targeted lookup can recover reference-listed players missed by t
 - An offline copy changing **Bukayo Saka (246669)** from **89** to **95** was written. Exactly **one byte** differed. Re-reading the output with the same scanner returned **95**.
 - The archived input hash stayed unchanged. The active Career Mode save and FC27 process were never touched.
 - A second offline test changed Ngumoha's potential from **88 to 99**, with **one changed byte**. A targeted read of that patched copy recovered **99** with two remaining anchors (inspection-only). No in-game validation yet.
-- Synthetic tests for bit-field reading, writing, and targeted lookup: **5 passed**.
+- Fresh Liverpool manager career snapshot `CmMgrC20261119062605986`: **20,845** candidate players found. Rio Ngumoha matched uniquely (ID **80376**, template OVR **75**, saved potential **88**, four 16-byte anchors, offset **1,498,605**).
+- Independently generated test file `CmMgrCTest-Liverpool-Ngumoha-pot99-20261119` changed only **one byte**, left the archived source SHA-256 intact, and decoded as **99** on fresh readback. The local browser API also successfully produced its own distinct one-byte patch file from this snapshot.
+- Synthetic tests for bit-field reading, writing, metadata variants, and targeted lookup: **10 passed**.
 
 **Unvalidated:** FC27 internal checksums; the game's acceptance of the modified career container; changed potential displayed in the game; whether the change persists after a game save. Never treat this build as a replacement for Live Editor until those checks pass.
 

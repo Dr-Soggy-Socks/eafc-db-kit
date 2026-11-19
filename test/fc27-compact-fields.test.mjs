@@ -32,6 +32,32 @@ test('recognises 8/9/16-byte compact descriptors by reversed shortname order', (
   assert.equal(block.safeForWriting,false);
   assert.deepEqual(b,before);
 });
+test('recognises the 10-byte descriptor variant in a new FC27 career', () => {
+  const bytes = Buffer.alloc(160);
+  let p = 10;
+  bytes.write('pQBA', p);
+  bytes[p + 4] = 6;
+  bytes[p + 5] = 0;
+  bytes.writeUInt32LE(64, p + 6);
+  p += 10;
+  bytes.write('aACB', p);
+  bytes.writeUInt32LE(7, p + 4);
+  bytes.writeUInt32LE(3, p + 8);
+  bytes.writeUInt32LE(70, p + 12);
+  p += 16;
+  bytes.write('KXDC', p);
+  bytes[p + 4] = 12;
+  bytes.writeUInt32LE(100, p + 5);
+  p += 9;
+  bytes.write('tYED', p);
+  const [block] = findCompactFieldBlocks(bytes, schema);
+  assert.ok(block);
+  assert.deepEqual(block.descriptors.map(f => f.serializedBytes), [10, 16, 9, null]);
+  assert.deepEqual(block.descriptors.map(f => f.bitOffset), [64, 70, 100, null]);
+  bytes[15] = 1; // The 10-byte variant requires a zero marker.
+  assert.deepEqual(findCompactFieldBlocks(bytes, schema), []);
+});
+
 test('rejects invalid depth and malformed descriptor links',()=>{
   const b=fixture();b[40+16+4]=99;
   assert.deepEqual(findCompactFieldBlocks(b,schema),[]);

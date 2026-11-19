@@ -5,7 +5,7 @@
  * This parser is deliberately separate from the legacy T3DB binary reader.
  * It infers bit positions in the serialized field map, NOT game record values.
  */
-const allowedGaps = [5, 8, 9, 11, 16];
+const allowedGaps = [5, 8, 9, 10, 11, 16];
 
 export function findCompactFieldBlocks(input, schemaFields) {
   const bytes = Buffer.isBuffer(input)
@@ -49,7 +49,13 @@ export function findCompactFieldBlocks(input, schemaFields) {
         valid = false;
         break;
       }
-      if ([5, 9, 11].includes(gap) && bytes[cursor + 4] !== field.depth) {
+      if ([5, 9, 10, 11].includes(gap) && bytes[cursor + 4] !== field.depth) {
+        valid = false;
+        break;
+      }
+      // Some career snapshots encode an extended field as depth (1 byte),
+      // zero marker (1 byte), and its offset (4 bytes): a 10-byte entry.
+      if (gap === 10 && bytes[cursor + 5] !== 0) {
         valid = false;
         break;
       }
@@ -59,7 +65,7 @@ export function findCompactFieldBlocks(input, schemaFields) {
         break;
       }
       const rawOffset = [5, 11].includes(gap) ? null
-        : bytes.readUInt32LE(cursor + (gap === 8 ? 4 : gap === 9 ? 5 : 12));
+        : bytes.readUInt32LE(cursor + (gap === 8 ? 4 : gap === 9 ? 5 : gap === 10 ? 6 : 12));
       // Some FC27 descriptors omit or reorder offsets. Preserve the field match,
       // but never treat implausible values as decoded bit positions.
       const bitOffset = rawOffset !== null && rawOffset <= 100_000 ? rawOffset : null;
